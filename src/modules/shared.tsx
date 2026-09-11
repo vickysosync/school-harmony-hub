@@ -1,10 +1,15 @@
-import { useNavigate } from "@tanstack/react-router";
+"use client";
+
+import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 import { invoiceTotal } from "@/utils/helpers";
 
 export function useGoto() {
-  const navigate = useNavigate();
-  return (slug: string) => navigate({ to: "/app/$", params: { _splat: slug } });
+  const router = useRouter();
+  return (slug: string) => {
+    const cleanSlug = slug.replace(/^\/+/, "");
+    router.push(`/app/${cleanSlug}`);
+  };
 }
 
 export function Badge({ tone = "muted", children }: { tone?: string; children: React.ReactNode }) {

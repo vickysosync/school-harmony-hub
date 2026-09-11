@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Copy, Pencil, Plus, Printer, Send, Trash2 } from "lucide-react";
