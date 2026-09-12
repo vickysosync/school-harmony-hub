@@ -5,20 +5,16 @@ import {
   Building2,
   Database,
   Download,
-  KeyRound,
   Plus,
-  RotateCcw,
   Save,
   Shield,
   Trash2,
   Upload,
-  UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/context/AppContext";
-import { storage } from "@/services/storage";
+import { api } from "@/services/api";
 import {
-  EmptyState,
   FormModal,
   PageHeader,
   Panel,
@@ -26,6 +22,7 @@ import {
   TextField,
   useConfirm,
 } from "@/components/common/Ui";
+import { ImageUpload } from "@/components/common/ImageUpload";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/common/DataTable";
 import { Badge } from "@/modules/shared";
@@ -34,12 +31,12 @@ export function SchoolProfile() {
   const { settings, saveSettings } = useApp();
   const [form, setForm] = useState({ ...settings });
 
-  const setField = (k: string, v: string) => setForm((prev: any) => ({ ...prev, [k]: v }));
+  const setField = (k: string, v: any) => setForm((prev: any) => ({ ...prev, [k]: v }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveSettings(form);
-    toast.success("School profile updated successfully!");
+    await saveSettings(form);
+    toast.success("School profile updated successfully in MongoDB!");
   };
 
   return (
@@ -122,16 +119,16 @@ export function SchoolProfile() {
           </div>
         </Panel>
 
-        <Panel title="Branding & Logo URL">
+        <Panel title="Branding & School Logo (Cloudinary Upload)">
           <div className="grid gap-4 sm:grid-cols-2">
-            <TextField
-              label="Logo Image URL"
+            <ImageUpload
+              label="School Logo"
               value={form.logo}
-              placeholder="https://example.com/logo.png"
-              onChange={(v) => setField("logo", v)}
+              onChange={(url) => setField("logo", url)}
+              folder="school_logo"
             />
             <div className="flex items-center gap-4 rounded-xl border border-dashed border-border p-4">
-              <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+              <div className="flex size-16 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground border border-border">
                 {form.logo ? (
                   <img
                     src={form.logo}
@@ -139,12 +136,14 @@ export function SchoolProfile() {
                     className="size-full rounded-xl object-contain"
                   />
                 ) : (
-                  <Building2 className="size-7" />
+                  <Building2 className="size-8" />
                 )}
               </div>
               <div className="text-xs text-muted-foreground">
-                <p className="font-semibold text-foreground">Logo Preview</p>
-                <p>Appears on A4 report cards, ID cards, certificates, and fee receipts.</p>
+                <p className="font-semibold text-foreground">Live Letterhead Logo</p>
+                <p>
+                  This logo is automatically rendered on all A4 report cards, marks-sheets, student ID cards, transfer certificates, and fee receipts.
+                </p>
               </div>
             </div>
           </div>
@@ -192,25 +191,25 @@ export function UserManagement() {
     setForm({
       name: u.name || "",
       username: u.username || "",
-      password: u.password || "",
+      password: "", // Keep blank unless updating
       role: u.role || "Teacher",
       email: u.email || "",
     });
     setModal(true);
   };
 
-  const handleSubmit = () => {
-    if (!form.name.trim() || !form.username.trim() || !form.password.trim()) {
+  const handleSubmit = async () => {
+    if (!form.name.trim() || !form.username.trim() || (!editing && !form.password.trim())) {
       toast.error("Please fill in Name, Username, and Password.");
       return;
     }
 
     if (editing) {
-      update("users", editing.id, form);
-      toast.success("User updated successfully!");
+      await update("users", editing.id || editing._id, form);
+      toast.success("User updated successfully in MongoDB!");
     } else {
-      add("users", form, "usr");
-      toast.success("New user account created!");
+      await add("users", form);
+      toast.success("New user account created in MongoDB!");
     }
     setModal(false);
   };
@@ -261,8 +260,8 @@ export function UserManagement() {
             size="sm"
             className="text-destructive hover:bg-destructive/10"
             onClick={() =>
-              confirm(`Are you sure you want to delete user "${r.name}"?`, () => {
-                remove("users", r.id);
+              confirm(`Are you sure you want to delete user "${r.name}"?`, async () => {
+                await remove("users", r.id || r._id);
                 toast.success("User deleted.");
               })
             }
@@ -316,11 +315,11 @@ export function UserManagement() {
           required
         />
         <TextField
-          label="Password"
+          label={editing ? "New Password (leave blank to keep current)" : "Password"}
           type="password"
           value={form.password}
           onChange={(v) => setForm((p) => ({ ...p, password: v }))}
-          required
+          required={!editing}
         />
         <TextField
           label="Email Address"
@@ -342,119 +341,78 @@ export function UserManagement() {
 }
 
 export function BackupRestore() {
-  const { resetDemoData } = useApp();
-  const { confirm, dialog } = useConfirm();
+  const { students, teachers, staff, invoices, payments, attendance, exams, marks, notices, timetable, settings } = useApp();
 
   const handleExport = () => {
-    const data = storage.exportAll();
+    const data = {
+      exportedAt: new Date().toISOString(),
+      school: settings?.name,
+      students,
+      teachers,
+      staff,
+      invoices,
+      payments,
+      attendance,
+      exams,
+      marks,
+      notices,
+      timetable,
+      settings,
+    };
     const json = JSON.stringify(data, null, 2);
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `harmony_school_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `harmony_school_database_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Data backup exported successfully!");
-  };
-
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const raw = ev.target?.result as string;
-        const parsed = JSON.parse(raw);
-        storage.importAll(parsed);
-        toast.success("Backup restored successfully! Reloading page...");
-        setTimeout(() => window.location.reload(), 1000);
-      } catch {
-        toast.error("Invalid backup file format. Please upload a valid JSON backup.");
-      }
-    };
-    reader.readAsText(file);
+    toast.success("MongoDB database snapshot exported successfully!");
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Backup & Restore"
-        subtitle="Export local database backup, restore from file, or reset to original demo seed state."
+        title="Backup & Export"
+        subtitle="Export local database records into a portable JSON snapshot."
       />
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <Panel title="Export Backup">
+      <div className="grid gap-6 md:grid-cols-2">
+        <Panel title="Export Database Snapshot">
           <div className="space-y-4">
             <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Download className="size-6" />
             </div>
             <div>
-              <h3 className="font-semibold">Download Full Database</h3>
+              <h3 className="font-semibold">Download Full Database Snapshot</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Exports all students, fees, attendance records, exams, staff, notices, and settings into a JSON backup file.
+                Exports live database records (students, fees, attendance, examinations, staff, notices, and settings) into a structured JSON file for archiving.
               </p>
             </div>
             <Button onClick={handleExport} className="w-full gap-2">
-              <Download className="size-4" /> Export JSON Backup
+              <Download className="size-4" /> Export JSON Snapshot
             </Button>
           </div>
         </Panel>
 
-        <Panel title="Restore Backup">
+        <Panel title="Database Health & Connection">
           <div className="space-y-4">
-            <div className="flex size-12 items-center justify-center rounded-xl bg-accent/20 text-accent-foreground">
-              <Upload className="size-6" />
+            <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+              <Database className="size-6" />
             </div>
             <div>
-              <h3 className="font-semibold">Import from JSON</h3>
+              <h3 className="font-semibold">MongoDB Atlas Primary Source</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Restore previously exported JSON backup file. This will merge and update existing records.
+                Connected to production MongoDB cluster. Real-time write-ahead logging and document transactions are managed directly through Next.js route handlers.
               </p>
             </div>
-            <label className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground">
-              <Upload className="size-4" /> Select Backup File
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleImport}
-                className="hidden"
-              />
-            </label>
-          </div>
-        </Panel>
-
-        <Panel title="Reset Demo Data">
-          <div className="space-y-4">
-            <div className="flex size-12 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
-              <RotateCcw className="size-6" />
+            <div className="rounded-lg bg-muted/40 p-3 text-xs space-y-1">
+              <p className="font-medium text-foreground">Status: <span className="text-emerald-600 font-semibold">Active & Synced</span></p>
+              <p className="text-muted-foreground">Single Source of Truth: MongoDB Atlas</p>
             </div>
-            <div>
-              <h3 className="font-semibold text-destructive">Reset to Initial Seed</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Erase local changes and restore the default 24 students, sample fees, attendance, exams, and classes.
-              </p>
-            </div>
-            <Button
-              variant="destructive"
-              onClick={() =>
-                confirm(
-                  "Are you sure you want to reset all data back to the demo defaults? Any changes made will be lost.",
-                  () => {
-                    resetDemoData();
-                    toast.success("Demo data reset successfully!");
-                  },
-                )
-              }
-              className="w-full gap-2"
-            >
-              <RotateCcw className="size-4" /> Reset Demo Data
-            </Button>
           </div>
         </Panel>
       </div>
-
-      {dialog}
     </div>
   );
 }

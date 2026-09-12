@@ -2,13 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, GraduationCap, Loader2, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, GraduationCap, Loader2, Mail, Send, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useApp } from "@/context/AppContext";
+import { api } from "@/services/api";
 
 const ROLES = ["Admin", "Teacher", "Accountant", "Staff"];
 const DEMO: Record<string, { u: string; p: string }> = {
@@ -28,16 +37,21 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
 
+  // Forgot password modal state
+  const [forgotModal, setForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotBusy, setForgotBusy] = useState(false);
+
   useEffect(() => {
     if (ready && user) {
       router.push("/app/dashboard");
     }
   }, [ready, user, router]);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    const err = login(username.trim(), password, role, remember);
+    const err = await login(username.trim(), password, role, remember);
     setBusy(false);
     if (err) {
       toast.error(err);
@@ -47,7 +61,31 @@ export default function LoginPage() {
     router.push("/app/dashboard");
   };
 
-  const useDemo = (r: string) => {
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) {
+      toast.error("Please enter your registered email address.");
+      return;
+    }
+
+    setForgotBusy(true);
+    try {
+      const res = await api.auth.forgotPassword(forgotEmail);
+      if (res.success) {
+        toast.success(res.message || "Password reset email sent! Check your inbox.");
+        setForgotModal(false);
+        setForgotEmail("");
+      } else {
+        toast.error(res.error || "Failed to send password reset email.");
+      }
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setForgotBusy(false);
+    }
+  };
+
+  const selectDemoRole = (r: string) => {
     setRole(r);
     setUsername(DEMO[r].u);
     setPassword(DEMO[r].p);
@@ -61,15 +99,15 @@ export default function LoginPage() {
             <GraduationCap className="size-6" />
           </div>
           <div>
-            <p className="text-lg font-bold leading-tight">{settings.name}</p>
-            <p className="text-xs opacity-70">{settings.tagline}</p>
+            <p className="text-lg font-bold leading-tight">{settings?.name || "Harmony Public School"}</p>
+            <p className="text-xs opacity-70">{settings?.tagline || "Knowledge • Discipline • Excellence"}</p>
           </div>
         </div>
 
         <div className="max-w-md space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-sidebar-border bg-sidebar-accent/50 px-3 py-1 text-xs font-medium text-sidebar-primary-foreground">
             <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-            Next.js 15 Powered ERP
+            MongoDB Connected ERP
           </div>
           <h2 className="text-4xl font-bold leading-tight">
             One unified portal for every part of your school.
@@ -93,8 +131,8 @@ export default function LoginPage() {
         </div>
 
         <div className="flex items-center justify-between text-xs opacity-60 border-t border-sidebar-border pt-4">
-          <p>{settings.affiliation}</p>
-          <p>School Code: {settings.code}</p>
+          <p>{settings?.affiliation || "CBSE Affiliation No. 1030412"}</p>
+          <p>School Code: {settings?.code || "HPS-1042"}</p>
         </div>
       </section>
 
@@ -105,8 +143,8 @@ export default function LoginPage() {
               <GraduationCap className="size-6" />
             </div>
             <div>
-              <p className="text-base font-bold leading-tight">{settings.name}</p>
-              <p className="text-xs text-muted-foreground">{settings.tagline}</p>
+              <p className="text-base font-bold leading-tight">{settings?.name || "Harmony Public School"}</p>
+              <p className="text-xs text-muted-foreground">{settings?.tagline || "Knowledge • Discipline • Excellence"}</p>
             </div>
           </div>
 
@@ -120,7 +158,7 @@ export default function LoginPage() {
               <button
                 key={r}
                 type="button"
-                onClick={() => useDemo(r)}
+                onClick={() => selectDemoRole(r)}
                 className={`rounded-lg border px-2 py-2 text-xs font-semibold transition-all ${
                   role === r
                     ? "border-primary bg-primary text-primary-foreground shadow-sm"
@@ -173,9 +211,7 @@ export default function LoginPage() {
               </label>
               <button
                 type="button"
-                onClick={() =>
-                  toast.info("Please contact the school administrator (admin@harmonyschool.edu.in) to reset your password.")
-                }
+                onClick={() => setForgotModal(true)}
                 className="text-sm font-medium text-primary hover:underline"
               >
                 Forgot password?
@@ -190,7 +226,7 @@ export default function LoginPage() {
 
           <div className="mt-6 rounded-xl border border-dashed border-border bg-card/60 p-4 text-xs">
             <p className="mb-2 font-semibold uppercase tracking-wider text-muted-foreground">
-              Demo Credentials
+              Demo Credentials (MongoDB Backed)
             </p>
             <div className="grid gap-1.5 sm:grid-cols-2">
               {ROLES.map((r) => (
@@ -203,6 +239,44 @@ export default function LoginPage() {
           </div>
         </div>
       </section>
+
+      {/* Forgot Password Modal */}
+      <Dialog open={forgotModal} onOpenChange={setForgotModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="size-5 text-primary" /> Reset Password
+            </DialogTitle>
+            <DialogDescription>
+              Enter your registered email address and we&apos;ll send you a password reset link via SMTP.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleForgotPassword} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="femail">Registered Email</Label>
+              <Input
+                id="femail"
+                type="email"
+                placeholder="e.g. admin@harmonyschool.edu.in"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button type="button" variant="outline" onClick={() => setForgotModal(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={forgotBusy} className="gap-2">
+                {forgotBusy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                Send Reset Link
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

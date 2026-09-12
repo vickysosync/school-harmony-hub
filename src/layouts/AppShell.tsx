@@ -249,7 +249,7 @@ export function AppShell({ slug }: { slug: string }) {
             <div className="flex flex-col items-center gap-3 py-24 text-center">
               <h2 className="text-xl font-semibold">Page not available</h2>
               <p className="text-sm text-muted-foreground">
-                This module doesn't exist or your role has no access to it.
+                This module doesn&apos;t exist or your role has no access to it.
               </p>
               <Link
                 href="/app/dashboard"

@@ -23,6 +23,8 @@ const BLANK = {
   previousSchool: "", status: "Active",
 };
 
+import { ImageUpload } from "@/components/common/ImageUpload";
+
 function StudentFormFields({ form, set, classes, sections }: any) {
   return (
     <>
@@ -48,6 +50,14 @@ function StudentFormFields({ form, set, classes, sections }: any) {
       <TextField label="Guardian Occupation" value={form.occupation} onChange={(v) => set("occupation", v)} />
       <TextField label="Previous School" value={form.previousSchool} onChange={(v) => set("previousSchool", v)} />
       <SelectField label="Status" value={form.status} onChange={(v) => set("status", v)} options={["Active", "Inactive", "Transferred"]} />
+      <div className="sm:col-span-2 lg:col-span-3">
+        <ImageUpload
+          label="Student Photo (Cloudinary Upload)"
+          value={form.photo}
+          onChange={(url) => set("photo", url)}
+          folder="students"
+        />
+      </div>
     </>
   );
 }
@@ -173,14 +183,19 @@ export function AddStudent() {
   const goto = useGoto();
   const [form, setForm] = useState<any>({ ...BLANK, admissionNo: `ADM${2025100 + students.length + 1}` });
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
-  const save = () => {
+  const save = async () => {
     if (!form.name.trim()) {
       toast.error("Student name is required.");
       return;
     }
-    const created = add("students", form, "stu");
+    const created = await add("students", form, "stu");
     toast.success("Student admitted successfully.");
-    goto(`students/profile/${created.id}`);
+    const targetId = created?.id || (created as any)?._id;
+    if (targetId) {
+      goto(`students/profile/${targetId}`);
+    } else {
+      goto("students");
+    }
   };
   return (
     <div>

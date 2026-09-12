@@ -17,6 +17,8 @@ const emptyTeacher = {
   qualification: "", subject: SUBJECTS[0]?.name || "", classTeacherOf: "", joiningDate: today(), salary: 30000,
 };
 
+import { ImageUpload } from "@/components/common/ImageUpload";
+
 function TeacherForm({ form, set }: { form: any; set: (k: string, v: any) => void }) {
   return (
     <>
@@ -37,6 +39,14 @@ function TeacherForm({ form, set }: { form: any; set: (k: string, v: any) => voi
       <TextField label="Class Teacher Of" value={form.classTeacherOf} onChange={(v) => set("classTeacherOf", v)} />
       <TextField label="Joining Date" type="date" value={form.joiningDate} onChange={(v) => set("joiningDate", v)} />
       <TextField label="Monthly Salary" type="number" value={form.salary} onChange={(v) => set("salary", Number(v))} />
+      <div className="sm:col-span-2">
+        <ImageUpload
+          label="Teacher Photo (Cloudinary)"
+          value={form.photo}
+          onChange={(url) => set("photo", url)}
+          folder="teachers"
+        />
+      </div>
     </>
   );
 }

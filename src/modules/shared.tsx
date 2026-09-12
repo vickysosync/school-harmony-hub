@@ -60,4 +60,4 @@ export const FEE_HEADS = [
   "Transport Fee", "Computer Fee", "Activity Fee", "Other Charges",
 ];
 
-export const PAYMENT_MODES = ["Cash", "UPI", "Card", "Bank Transfer", "Cheque"];
+export const PAYMENT_MODES = ["Cash", "UPI", "Card", "Bank Transfer", "Cheque", "Razorpay Online"];
